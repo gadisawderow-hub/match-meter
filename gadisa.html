@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Love & Friendship Match</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #fff8ff;
+      --muted: #e6d9f0;
+      --pink: #ff76b7;
+      --gold: #ffdc80;
+      --panel: rgba(255, 255, 255, .09);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 28px 16px;
+      color: var(--ink);
+      font: 16px/1.55 system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse at 15% 10%, #542a73, transparent 45%),
+        linear-gradient(140deg, #160f2d, #301333 60%, #17102a);
+    }
+
+    main { width: min(720px, 100%); margin: 0 auto; }
+
+    header { text-align: center; margin: 10px 0 24px; }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      line-height: 1.05;
+    }
+
+    header p, .note { color: var(--muted); }
+
+    .panel, #result {
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 18px 50px #09061166;
+    }
+
+    form { display: grid; gap: 16px; }
+
+    .fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    label { display: grid; gap: 6px; font-weight: 700; }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ffffff3b;
+      border-radius: 12px;
+      background: #180f2b;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    input:focus, select:focus, button:focus-visible {
+      outline: 3px solid var(--gold);
+      outline-offset: 2px;
+    }
+
+    button {
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--gold), var(--pink));
+      color: #28132c;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:hover { filter: brightness(1.08); }
+
+    #result { margin-top: 20px; text-align: center; }
+    #result[hidden] { display: none; }
+
+    .score {
+      margin: 4px 0;
+      color: var(--gold);
+      font-size: clamp(3rem, 14vw, 5rem);
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .result-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .note { margin: 16px 0 0; font-size: .92rem; }
+    #status { min-height: 1.5em; margin: 12px 0 0; color: var(--gold); }
+
+    @media print {
+      body { padding: 0; background: white; color: #21142c; }
+      header, .panel, .result-actions, #status, .note { display: none !important; }
+      main { width: 100%; }
+      #result {
+        display: block !important;
+        margin: 0;
+        border: 0;
+        box-shadow: none;
+        color: #21142c;
+      }
+      .score { color: #a32070; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>💖 The Match Meter 💖</h1>
+      <p>For friends, siblings, and future-crush daydreams. Just for fun—not a real measure of anyone’s feelings!</p>
+    </header>
+
+    <section class="panel" aria-label="Match calculator">
+      <form id="matchForm">
+        <div class="fields">
+          <label for="yourName">
+            Your name
+            <input id="yourName" name="yourName" maxlength="40" autocomplete="given-name" required>
+          </label>
+
+          <label for="theirName">
+            Their name
+            <input id="theirName" name="theirName" maxlength="40" autocomplete="off" required>
+          </label>
+
+          <label for="theirAge">
+            Their age
+            <input id="theirAge" name="theirAge" type="number" min="1" max="120" inputmode="numeric" required>
+          </label>
+
+          <label for="theirChoice">
+            How should the result refer to them?
+            <select id="theirChoice" name="theirChoice">
+              <option value="auto">Choose for me</option>
+              <option value="girl">Girl</option>
+              <option value="boy">Boy</option>
+              <option value="other">Keep it neutral</option>
+              <option value="sister">Sister</option>
+              <option value="brother">Brother</option>
+              <option value="bestie">Best friend</option>
+            </select>
+          </label>
+        </div>
+
+        <button type="submit">Calculate our match ✨</button>
+      </form>
+      <p class="note">Your answers stay in this browser. The score is a silly name-based game, not a prediction.</p>
+    </section>
+
+    <section id="result" aria-live="polite" hidden>
+      <p id="namesLine"></p>
+      <p class="score" id="score"></p>
+      <h2 id="verdict"></h2>
+      <p id="message"></p>
+      <p id="ageLine"></p>
+      <div class="result-actions">
+        <button type="button" id="copyButton">Copy result</button>
+        <button type="button" id="printButton">Print / save result</button>
+      </div>
+    </section>
+
+    <p id="status" role="status"></p>
+  </main>
+
+  <script>
+    const form = document.getElementById("matchForm");
+    const result = document.getElementById("result");
+    const status = document.getElementById("status");
+
+    function getScore(first, second) {
+      // Sort names so the same pair gets the same score in either order.
+      const pair = [first.trim().toLocaleLowerCase(), second.trim().toLocaleLowerCase()]
+        .sort()
+        .join("|");
+
+      let hash = 2166136261;
+      for (const character of pair) {
+        hash ^= character.codePointAt(0);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0) % 101;
+    }
+
+    function getTitle(choice, age) {
+      if (age < 18) {
+        if (choice === "sister" || choice === "girl") return "sister";
+        if (choice === "brother" || choice === "boy") return "brother";
+        if (choice === "bestie") return "best friend";
+        return "friend";
+      }
+
+      if (choice === "sister") return "sister";
+      if (choice === "brother") return "brother";
+      if (choice === "bestie") return "best friend";
+      if (choice === "girl") return "future wife";
+      if (choice === "boy") return "future husband";
+      return "special person";
+    }
+
+    function getVerdict(score, age) {
+      if (age < 18) {
+        if (score > 90) return ["WOW, AMAZING! 🌟", "You two make an excellent friend or sibling team!"];
+        if (score > 80) return ["AMAZING! 💖", "You have a wonderfully strong friendship match!"];
+        return ["A lovely connection! 😊", "Good friends can make any day brighter."];
+      }
+
+      if (score > 90) return ["WOW, AMAZING! 🌟", "You and this person are a great match—for fun, friendship, and maybe a future together!"];
+      if (score > 80) return ["AMAZING! 💖", "You and this person could be really good for each other!"];
+      return ["A cute connection! 😊", "Keep getting to know each other—the best part is the real-life connection."];
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      status.textContent = "";
+
+      const yourName = document.getElementById("yourName").value.trim();
+      const theirName = document.getElementById("theirName").value.trim();
+      const age = Number(document.getElementById("theirAge").value);
+      const choice = document.getElementById("theirChoice").value;
+
+      if (!yourName || !theirName || !Number.isInteger(age) || age < 1 || age > 120) {
+        status.textContent = "Please enter both names and a whole-number age from 1 to 120.";
+        result.hidden = true;
+        return;
+      }
+
+      const score = getScore(yourName, theirName);
+      const [verdict, message] = getVerdict(score, age);
+      const title = getTitle(choice, age);
+
+      document.getElementById("namesLine").textContent =
+        `${yourName} + ${theirName} (${title})`;
+      document.getElementById("score").textContent = `${score}%`;
+      document.getElementById("verdict").textContent = verdict;
+      document.getElementById("message").textContent = message;
+      document.getElementById("ageLine").textContent = age > 30
+        ? "Dullomtetta Heerumi! ✨"
+        : "Ammayyuu Da'ima! ✨";
+
+      result.hidden = false;
+      result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+
+    document.getElementById("copyButton").addEventListener("click", async () => {
+      const text = [
+        document.getElementById("namesLine").textContent,
+        `${document.getElementById("score").textContent} match`,
+        document.getElementById("verdict").textContent,
+        document.getElementById("message").textContent,
+        document.getElementById("ageLine").textContent
+      ].join("\n");
+
+      try {
+        await navigator.clipboard.writeText(text);
+        status.textContent = "Result copied!";
+      } catch {
+        status.textContent = "Copy failed. You can still use Print / save result.";
+      }
+    });
+
+    document.getElementById("printButton").addEventListener("click", () => window.print());
+  </script>
+</body>
+</html>
+
